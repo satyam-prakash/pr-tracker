@@ -20,14 +20,14 @@ app.use(cors({
     origin: process.env.CLIENT_URL, 
     credentials: true 
 }));
-app.use(auth);
+app.use(healthRoutes);
 
+app.use(auth);
 app.use((req,res,next)=>{
   console.log("gateway req.user:", req.user);
   next();
 });
 
-app.use(healthRoutes);
 
 app.use(authRoutes);
 app.use(dbRoutes);
