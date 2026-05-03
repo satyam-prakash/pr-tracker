@@ -98,7 +98,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=mongodb-service
 
       - name: Deploy to EC2
-        if: ${{ secrets.VPS_HOST != '' }}
+        continue-on-error: true
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -107,3 +107,4 @@ jobs:
           script: |
             cd /opt/pr-tracker
             bash deploy/deploy-mongodb-service.sh
+
