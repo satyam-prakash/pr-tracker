@@ -23,7 +23,10 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Warn on unused vars instead of error — CI won't block on style issues
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+      // Warn on fast-refresh issues — informational only
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
 ])

@@ -26,7 +26,6 @@ function AppContent() {
   const {
     setRepos,
     setActiveRepository,
-    activeRepository,
     setUser,
     user,
     setRefreshRepos,

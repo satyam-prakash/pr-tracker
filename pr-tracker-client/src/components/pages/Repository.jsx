@@ -1,7 +1,6 @@
 import { Plus, GitBranch } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { timeAgo } from "../../utils/timeAgo";
 import { useRepo } from "../../context/RepoContext";
 import { ImportRepoModal } from "../features/repos/ImportRepoModal";
 
