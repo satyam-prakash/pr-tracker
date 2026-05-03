@@ -758,7 +758,7 @@ function MarkdownBody({ children }) {
           );
         },
         // Inline code and block code
-        code({ className, children, node, ...props }) {
+        code({ className, children, node: _node, ...props }) {
           const match = /language-(\w+)/.exec(className || "");
           const isInline = !match && !String(children).includes("\n");
           if (isInline) {

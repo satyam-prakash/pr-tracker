@@ -36,13 +36,6 @@ function PRColumn({ title, prs }) {
 function PRCard({ pr }) {
   const navigate = useNavigate();
 
-  const variantMap = {
-    Ready: "open",
-    Blocked: "draft",
-    Review: "review",
-    Stale: "default",
-  };
-
   return (
     <div
       onClick={() => navigate(`/pull-requests/${pr.id}`)}

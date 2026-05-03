@@ -23,9 +23,14 @@ export default defineConfig([
       },
     },
     rules: {
-      // Warn on unused vars instead of error — CI won't block on style issues
-      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
-      // Warn on fast-refresh issues — informational only
+      // Allow PascalCase args (icon: Icon pattern in React) and _-prefixed args
+      'no-unused-vars': ['warn', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^_|^[A-Z]',
+        destructuredArrayIgnorePattern: '^_',
+        caughtErrors: 'none',
+      }],
+      // Fast-refresh: warn only — informational, does not block CI
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },

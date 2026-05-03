@@ -22,7 +22,7 @@ const STATUS_CONFIG = [
   { key: "Closed", color: "bg-red-500", text: "text-red-400", bg: "bg-red-500/10" },
 ];
 
-export function Dashboard({ user, needsImport, loading: appLoading }) {
+export function Dashboard({ needsImport, loading: appLoading }) {
   const { repos, activeRepository } = useRepo();
   const [prs, setPrs] = useState([]);
   const [fetching, setFetching] = useState(false);
