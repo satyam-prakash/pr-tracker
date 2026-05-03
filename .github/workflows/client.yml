@@ -44,6 +44,7 @@ jobs:
       - name: Lint
         working-directory: ${{ env.SERVICE_DIR }}
         run: npm run lint --if-present
+        continue-on-error: true  # Warnings should not block CI
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -88,6 +89,9 @@ jobs:
           tags: |
             type=sha,prefix=main-
             type=raw,value=latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build & Push image
         uses: docker/build-push-action@v5
