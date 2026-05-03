@@ -102,7 +102,6 @@ jobs:
           cache-to: type=gha,mode=max,scope=auth
 
       - name: Deploy to EC2
-        continue-on-error: true
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -111,4 +110,5 @@ jobs:
           script: |
             cd /opt/pr-tracker
             bash deploy/deploy-auth.sh
+
 
