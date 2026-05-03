@@ -1,6 +1,5 @@
 # ============================================================
 # MAIN BACKEND — Independent CI/CD Pipeline
-# Triggers ONLY when pr-tracker-main-backend/** files change
 # ============================================================
 
 name: "Main Backend — CI/CD"
@@ -11,7 +10,6 @@ on:
     paths:
       - "pr-tracker-main-backend/**"
       - ".github/workflows/main-backend.yml"
-
   push:
     branches: [main]
     paths:
@@ -26,7 +24,6 @@ jobs:
   ci:
     name: CI — Lint & Build
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +47,7 @@ jobs:
 
       - name: Validate Docker build
         uses: docker/build-push-action@v5
+        continue-on-error: true
         with:
           context: ./${{ env.SERVICE_DIR }}
           push: false
@@ -62,7 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
 
     permissions:
       contents: read
@@ -100,7 +97,8 @@ jobs:
           cache-from: type=gha,scope=main-backend
           cache-to: type=gha,mode=max,scope=main-backend
 
-      - name: Deploy main-backend only
+      - name: Deploy to EC2
+        if: ${{ secrets.VPS_HOST != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}

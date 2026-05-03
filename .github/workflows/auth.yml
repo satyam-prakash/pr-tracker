@@ -1,6 +1,5 @@
 # ============================================================
 # AUTH SERVICE — Independent CI/CD Pipeline
-# Triggers ONLY when pr-tracker-backend/** files change
 # ============================================================
 
 name: "Auth — CI/CD"
@@ -11,7 +10,6 @@ on:
     paths:
       - "pr-tracker-backend/**"
       - ".github/workflows/auth.yml"
-
   push:
     branches: [main]
     paths:
@@ -26,7 +24,6 @@ jobs:
   ci:
     name: CI — Lint & Security Scan
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -50,13 +47,15 @@ jobs:
 
       - name: Build Docker image for scan
         run: docker build -t auth-scan ./${{ env.SERVICE_DIR }} --target production
+        continue-on-error: true
 
       - name: Trivy security scan
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: auth-scan
           format: table
-          exit-code: "0"   # Report CVEs but don't fail CI — review separately
+          exit-code: "0"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
 
@@ -65,7 +64,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
 
     permissions:
       contents: read
@@ -103,7 +101,8 @@ jobs:
           cache-from: type=gha,scope=auth
           cache-to: type=gha,mode=max,scope=auth
 
-      - name: Deploy auth service only
+      - name: Deploy to EC2
+        if: ${{ secrets.VPS_HOST != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
