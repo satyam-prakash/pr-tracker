@@ -24,7 +24,7 @@ docker compose up -d --no-deps $SERVICE
 
 echo "⏳ Waiting for health check on $HEALTH_URL (90s max for AI init)..."
 ELAPSED=0
-until curl -sf $HEALTH_URL > /dev/null 2>&1; do
+until docker exec $CONTAINER wget --spider -q $HEALTH_URL > /dev/null 2>&1 || curl -sf $HEALTH_URL > /dev/null 2>&1; do
   if [ $ELAPSED -ge $MAX_WAIT ]; then
     echo "❌ Health check failed — rolling back..."
     docker compose stop $SERVICE
@@ -39,3 +39,4 @@ done
 
 docker image prune -f
 echo "✅ [ai-agent] Deployed successfully at $(date)"
+

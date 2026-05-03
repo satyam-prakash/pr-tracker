@@ -31,7 +31,7 @@ docker compose up -d --no-deps $SERVICE
 # ── Step 4: Health check loop ─────────────────────────────────
 echo "⏳ Waiting for health check..."
 ELAPSED=0
-until curl -sf $HEALTH_URL > /dev/null 2>&1; do
+until docker exec $CONTAINER wget --spider -q $HEALTH_URL > /dev/null 2>&1 || curl -sf $HEALTH_URL > /dev/null 2>&1; do
   if [ $ELAPSED -ge $MAX_WAIT ]; then
     echo "❌ Health check failed after ${MAX_WAIT}s — rolling back..."
     docker compose stop $SERVICE
@@ -49,3 +49,4 @@ done
 docker image prune -f
 
 echo "✅ [$SERVICE] Deployed successfully at $(date)"
+
