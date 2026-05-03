@@ -26,3 +26,7 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+ec2-key.pem
+*.pem
+*.key
