@@ -1,0 +1,173 @@
+# ============================================================
+# PR Tracker — Full Stack Docker Compose
+# All 7 services: nginx + client + gateway + auth + main + ai + mongodb-svc
+#
+# Usage:
+#   docker compose up -d           (production)
+#   docker compose logs -f         (view logs)
+#   docker compose down            (stop all)
+# ============================================================
+
+networks:
+  app-internal:
+    driver: bridge
+
+services:
+
+  # ── NGINX REVERSE PROXY ─────────────────────────────────────────
+  # Single public entry point. All traffic goes through here.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pr-tracker-nginx
+    ports:
+      - "80:80"         # Only port exposed to host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - client
+      - service-router
+    networks:
+      - app-internal
+    restart: unless-stopped
+
+  # ── REACT FRONTEND ──────────────────────────────────────────────
+  client:
+    build:
+      context: ./pr-tracker-client
+      dockerfile: Dockerfile
+      target: production
+      args:
+        # Vite bakes env vars at build time — must be passed here
+        VITE_SERVER_ENDPOINT: ${VITE_SERVER_ENDPOINT:-http://localhost}
+    container_name: pr-tracker-client
+    networks:
+      - app-internal
+    restart: unless-stopped
+
+  # ── API GATEWAY (port 5003 — matches service's own config) ──────
+  service-router:
+    build:
+      context: ./pr-tracker-service-router
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-gateway
+    environment:
+      - NODE_ENV=production
+      - PORT=5003
+      # Docker internal DNS — service names resolve automatically
+      - AUTH_SERVICE_URL=http://auth-service:5005
+      - CORE_SERVICE_URL=http://main-backend:5002
+      - AI_SERVICE_URL=http://ai-agent:5001
+      - DB_SERVICE_URL=http://mongodb-service:5004
+      - CLIENT_URL=${CLIENT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+    networks:
+      - app-internal
+    depends_on:
+      - auth-service
+      - main-backend
+      - ai-agent
+      - mongodb-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── AUTH SERVICE (port 5005) ────────────────────────────────────
+  auth-service:
+    build:
+      context: ./pr-tracker-backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-auth
+    environment:
+      - NODE_ENV=production
+      - PORT=5005
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - CLIENT_URL=${CLIENT_URL}
+      # Used in authController to redirect after OAuth success
+      - GATEWAY_URL=http://service-router:5003
+      # Used to call back through the gateway to reach the DB service
+      - PROXY_URL=http://service-router:5003
+    networks:
+      - app-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── MAIN BACKEND (port 5002) ────────────────────────────────────
+  main-backend:
+    build:
+      context: ./pr-tracker-main-backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-main
+    environment:
+      - NODE_ENV=production
+      - PORT=5002
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - PROXY_URL=http://service-router:5003
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+    networks:
+      - app-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5002/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── AI AGENT (port 5001) ────────────────────────────────────────
+  ai-agent:
+    build:
+      context: ./pr-tracker-ai-agent
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-ai
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - PROXY_URL=http://service-router:5003
+    networks:
+      - app-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── MONGODB DATA SERVICE (port 5004) ────────────────────────────
+  mongodb-service:
+    build:
+      context: ./pr-tracker-mongodb
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-mongodb
+    environment:
+      - NODE_ENV=production
+      - PORT=5004
+      - MONGODB_URI=${MONGO_URI}
+      - CLIENT_URL=${CLIENT_URL}
+    networks:
+      - app-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

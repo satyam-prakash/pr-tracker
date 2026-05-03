@@ -1,0 +1,56 @@
+# ============================================================
+# PR Tracker — Dev Overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# This file overrides the prod compose for local development:
+#   - Volume mounts enable hot reload without rebuilding images
+#   - Internal ports exposed for direct debugging
+#   - nodemon used instead of plain node
+# ============================================================
+
+services:
+
+  service-router:
+    build:
+      target: deps        # Use deps stage which has all node_modules
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./pr-tracker-service-router/src:/app/src
+    command: npx nodemon src/index.js
+
+  auth-service:
+    build:
+      target: deps
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./pr-tracker-backend/src:/app/src
+    command: npx nodemon server.js
+
+  main-backend:
+    build:
+      target: deps
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./pr-tracker-main-backend/src:/app/src
+    command: npx nodemon src/index.js
+
+  ai-agent:
+    build:
+      target: deps
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./pr-tracker-ai-agent:/app
+    command: npx nodemon index.js
+
+  client:
+    build:
+      target: builder
+    volumes:
+      - ./pr-tracker-client/src:/app/src
+    ports:
+      - "5173:5173"
+    command: npx vite --host

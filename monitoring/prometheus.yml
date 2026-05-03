@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    project: "pr-tracker"
+    env: "production"
+
+scrape_configs:
+
+  - job_name: "gateway"
+    static_configs:
+      - targets: ["service-router:5000"]
+    metrics_path: /metrics
+
+  - job_name: "auth-service"
+    static_configs:
+      - targets: ["auth-service:5001"]
+    metrics_path: /metrics
+
+  - job_name: "main-backend"
+    static_configs:
+      - targets: ["main-backend:5002"]
+    metrics_path: /metrics
+
+  - job_name: "ai-agent"
+    static_configs:
+      - targets: ["ai-agent:5003"]
+    metrics_path: /metrics
+
+  - job_name: "prometheus-self"
+    static_configs:
+      - targets: ["localhost:9090"]

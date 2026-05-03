@@ -1,0 +1,28 @@
+# ============================================================
+# PR Tracker — Root .gitignore
+# ============================================================
+
+# Environment files — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+
+# Docker
+*.log
+
+# Temporary files
+*.tmp
