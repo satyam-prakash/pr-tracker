@@ -178,11 +178,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Step 4a: Pre-clean — remove Docker-created directories ───
-      # scp-action uses tar to extract files. If Docker previously created
-      # a directory at nginx/nginx.conf (from a failed run), tar will fail
-      # with "Cannot open: File exists". We SSH first to remove them.
-      - name: Pre-clean bad directories on EC2
+      # ── Step 4a: Stop containers + clean up bad paths ────────────
+      # Must run BEFORE scp-action. When containers are running, Docker
+      # holds active bind mounts. Even after rm -rf, the running nginx
+      # container can cause tar to see "nginx/nginx.conf: Is a directory".
+      # Stopping containers first releases all bind mount locks.
+      - name: Stop containers and clean stale paths on EC2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -190,16 +191,24 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            mkdir -p /opt/pr-tracker/nginx
-            # Remove directory if Docker wrongly created it at a file-mount path
-            [ -d /opt/pr-tracker/nginx/nginx.conf ] \
-              && rm -rf /opt/pr-tracker/nginx/nginx.conf \
-              && echo "Removed bad nginx/nginx.conf directory" \
-              || echo "nginx/nginx.conf is OK (file or absent)"
+            cd /opt/pr-tracker
+
+            # Stop all containers (releases all bind mount file handles)
+            docker compose down || true
+
+            # Ensure nginx dir exists as a real directory
+            mkdir -p nginx
+
+            # Remove the directory Docker wrongly created at the file-mount path
+            if [ -d nginx/nginx.conf ]; then
+              rm -rf nginx/nginx.conf
+              echo "Cleaned up nginx/nginx.conf (was a directory)"
+            else
+              echo "nginx/nginx.conf is a file or absent — OK"
+            fi
 
       # ── Step 4b: SCP config files from runner → EC2 ─────────────
-      # EC2 is NOT a git repo, so we push updated files directly from
-      # the Actions runner (which has the latest checkout).
+      # Containers are now stopped so no bind mount locks exist.
       - name: Sync config files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -211,7 +220,7 @@ jobs:
           overwrite: true
           strip_components: 0
 
-      # ── Step 4c: SSH — pull images and restart services ───────────
+      # ── Step 4c: Pull images and start services ───────────────────
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -227,17 +236,18 @@ jobs:
               --username ${{ github.actor }} \
               --password-stdin
 
-            # Pull new images
+            # Pull new images (containers are down so this is pure pull, no restart conflict)
             docker compose pull
 
-            # Restart all services with new images
-            docker compose up -d --remove-orphans
+            # Start all services with new images
+            docker compose up -d
 
             # Clean up dangling images
             docker image prune -f
 
             echo "=== Deploy complete: $(date) ==="
             docker compose ps
+
 
 
 
