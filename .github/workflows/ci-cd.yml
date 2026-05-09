@@ -188,21 +188,38 @@ jobs:
             set -e
             cd /opt/pr-tracker
 
-            # Authenticate to GHCR so private images can be pulled
+            # ── Step 1: Sync latest code (compose files + config files) ─────
+            # Without git pull, EC2 runs docker compose up with stale files
+            # while new images expect new configs → mount errors.
+            git fetch origin main
+            git reset --hard origin/main
+
+            # ── Step 2: Fix Docker-created-directory-at-file-path bug ───────
+            # If a previous failed run caused Docker to create a directory
+            # where a bind-mount file is expected, remove it so Docker can
+            # do a proper file-to-file bind mount.
+            for f in nginx/nginx.conf; do
+              if [ -d "$f" ]; then
+                echo "WARNING: $f is a directory (Docker created it). Removing..."
+                rm -rf "$f"
+              fi
+            done
+
+            # ── Step 3: Authenticate to GHCR ────────────────────────────────
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
               --username ${{ github.actor }} \
               --password-stdin
 
-            # Pull all new images in parallel
+            # ── Step 4: Pull new images ──────────────────────────────────────
             docker compose pull
 
-            # Restart all services with new images, remove orphaned containers
+            # ── Step 5: Restart services ─────────────────────────────────────
             docker compose up -d --remove-orphans
 
-            # Remove dangling images to save disk space
+            # ── Step 6: Cleanup ───────────────────────────────────────────────
             docker image prune -f
 
-            # Print final health summary
+            # ── Step 7: Health summary ────────────────────────────────────────
             echo "=== Deploy complete: $(date) ==="
             docker compose ps
 
