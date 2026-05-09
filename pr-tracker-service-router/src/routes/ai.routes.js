@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
+const { createProxyMiddleware, fixRequestBody } = require("http-proxy-middleware");
 
 const router = Router();
 const AI_SERVICE = process.env.AI_SERVICE_URL;
@@ -25,6 +25,7 @@ router.use(
                 if (req.headers.authorization) {
                     proxyReq.setHeader('Authorization', req.headers.authorization);
                 }
+                fixRequestBody(proxyReq, req);
             },
             proxyRes: stripCorsHeaders,
         },
@@ -43,6 +44,7 @@ router.use(
                 if (req.headers.authorization) {
                     proxyReq.setHeader('Authorization', req.headers.authorization);
                 }
+                fixRequestBody(proxyReq, req);
             },
             proxyRes: stripCorsHeaders,
         },
@@ -60,6 +62,7 @@ router.use(
                 if (req.headers.authorization) {
                     proxyReq.setHeader('Authorization', req.headers.authorization);
                 }
+                fixRequestBody(proxyReq, req);
             },
             proxyRes: stripCorsHeaders,
         },

@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
+const { createProxyMiddleware, fixRequestBody } = require("http-proxy-middleware");
 
 const router = Router();
 const DB_SERVICE = process.env.DB_SERVICE_URL;
@@ -22,6 +22,7 @@ for (const prefix of dbPrefixes) {
                     if (userId) {
                         proxyReq.setHeader("x-user-id", userId);
                     }
+                    fixRequestBody(proxyReq, req);
                 },
             },
         })
@@ -41,6 +42,7 @@ router.use(
                 }
 
                 proxyReq.path = `/api/users${req.url}`;
+                fixRequestBody(proxyReq, req);
             },
         },
     })

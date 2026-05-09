@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
+const { createProxyMiddleware, fixRequestBody } = require("http-proxy-middleware");
 
 const router = Router();
 const CORE_SERVICE = process.env.CORE_SERVICE_URL;
@@ -20,6 +20,7 @@ for (const prefix of corePrefixes) {
                     if (req.headers.authorization) {
                         proxyReq.setHeader('Authorization', req.headers.authorization);
                     }
+                    fixRequestBody(proxyReq, req);
                 },
             },
         })
