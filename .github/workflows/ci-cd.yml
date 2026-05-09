@@ -178,6 +178,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── Step 4a: Push config files from runner → EC2 via SCP ────
+      # EC2 is NOT a git repo, so we can't git pull.
+      # Instead, we push the files that docker compose depends on directly.
+      - name: Sync config files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # Files/dirs to copy from the runner workspace
+          source: "docker-compose.yml,nginx/nginx.conf"
+          target: /opt/pr-tracker
+          # Overwrite existing files, preserve directory structure
+          strip_components: 0
+
+      # ── Step 4b: SSH to pull images and restart containers ───────
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -188,38 +204,32 @@ jobs:
             set -e
             cd /opt/pr-tracker
 
-            # ── Step 1: Sync latest code (compose files + config files) ─────
-            # Without git pull, EC2 runs docker compose up with stale files
-            # while new images expect new configs → mount errors.
-            git fetch origin main
-            git reset --hard origin/main
-
-            # ── Step 2: Fix Docker-created-directory-at-file-path bug ───────
-            # If a previous failed run caused Docker to create a directory
-            # where a bind-mount file is expected, remove it so Docker can
-            # do a proper file-to-file bind mount.
+            # ── Fix Docker-created-directory-at-file-path bug ───────
+            # A previous failed run may have caused Docker to create
+            # a directory where a bind-mount file is expected.
             for f in nginx/nginx.conf; do
               if [ -d "$f" ]; then
-                echo "WARNING: $f is a directory (Docker created it). Removing..."
+                echo "WARNING: $f is a directory. Removing..."
                 rm -rf "$f"
               fi
             done
 
-            # ── Step 3: Authenticate to GHCR ────────────────────────────────
+            # ── Authenticate to GHCR ─────────────────────────────────
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
               --username ${{ github.actor }} \
               --password-stdin
 
-            # ── Step 4: Pull new images ──────────────────────────────────────
+            # ── Pull new images ───────────────────────────────────────
             docker compose pull
 
-            # ── Step 5: Restart services ─────────────────────────────────────
+            # ── Restart services ─────────────────────────────────────
             docker compose up -d --remove-orphans
 
-            # ── Step 6: Cleanup ───────────────────────────────────────────────
+            # ── Cleanup old images ────────────────────────────────────
             docker image prune -f
 
-            # ── Step 7: Health summary ────────────────────────────────────────
+            # ── Health summary ────────────────────────────────────────
             echo "=== Deploy complete: $(date) ==="
             docker compose ps
+
 
