@@ -207,6 +207,10 @@ jobs:
               echo "nginx/nginx.conf is a file or absent — OK"
             fi
 
+            # Fix permissions: Docker runs as root and may have created the 'nginx'
+            # parent directory as root. We must chown it so SCP (running as ubuntu) can write.
+            sudo chown -R $USER:$USER /opt/pr-tracker
+
       # ── Step 4b: SCP config files from runner → EC2 ─────────────
       # Containers are now stopped so no bind mount locks exist.
       - name: Sync config files to EC2
