@@ -201,7 +201,7 @@ jobs:
 
             # Remove the directory Docker wrongly created at the file-mount path
             if [ -d nginx/nginx.conf ]; then
-              rm -rf nginx/nginx.conf
+              sudo rm -rf nginx/nginx.conf
               echo "Cleaned up nginx/nginx.conf (was a directory)"
             else
               echo "nginx/nginx.conf is a file or absent — OK"
