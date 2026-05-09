@@ -4,17 +4,13 @@
 
 name: "Client — CI/CD"
 
+# ⚠️  AUTO-TRIGGERS DISABLED — superseded by .github/workflows/ci-cd.yml
+# Keep this file for manual one-off deploys only (workflow_dispatch).
+# Enabling push/pull_request here alongside ci-cd.yml causes a race condition
+# where both pipelines SSH to EC2 simultaneously and corrupt health checks.
+
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "pr-tracker-client/**"
-      - ".github/workflows/client.yml"
-  push:
-    branches: [main]
-    paths:
-      - "pr-tracker-client/**"
-      - ".github/workflows/client.yml"
+  workflow_dispatch:
 
 env:
   SERVICE_DIR: pr-tracker-client

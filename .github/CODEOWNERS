@@ -1,0 +1,27 @@
+# CODEOWNERS — auto-assign reviewers on PRs
+# Format: <pattern>  <@github-username or @org/team>
+
+# Global fallback — everything requires review
+*                           @satyam-prakash
+
+# Frontend
+/pr-tracker-client/         @satyam-prakash
+
+# Services
+/pr-tracker-service-router/ @satyam-prakash
+/pr-tracker-main-backend/   @satyam-prakash
+/pr-tracker-backend/        @satyam-prakash
+/pr-tracker-ai-agent/       @satyam-prakash
+/pr-tracker-mongodb/        @satyam-prakash
+/pr-tracker-poller/         @satyam-prakash
+
+# Infrastructure — extra caution
+/infra/                     @satyam-prakash
+/k8s/                       @satyam-prakash
+/docker-compose*.yml        @satyam-prakash
+
+# CI/CD pipelines
+/.github/workflows/         @satyam-prakash
+
+# Documentation
+/docs/                      @satyam-prakash

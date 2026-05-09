@@ -4,17 +4,9 @@
 
 name: "Main Backend — CI/CD"
 
+# ⚠️  AUTO-TRIGGERS DISABLED — superseded by .github/workflows/ci-cd.yml
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "pr-tracker-main-backend/**"
-      - ".github/workflows/main-backend.yml"
-  push:
-    branches: [main]
-    paths:
-      - "pr-tracker-main-backend/**"
-      - ".github/workflows/main-backend.yml"
+  workflow_dispatch:
 
 env:
   SERVICE_DIR: pr-tracker-main-backend

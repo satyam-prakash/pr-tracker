@@ -4,17 +4,9 @@
 
 name: "MongoDB Service — CI/CD"
 
+# ⚠️  AUTO-TRIGGERS DISABLED — superseded by .github/workflows/ci-cd.yml
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "pr-tracker-mongodb/**"
-      - ".github/workflows/mongodb-service.yml"
-  push:
-    branches: [main]
-    paths:
-      - "pr-tracker-mongodb/**"
-      - ".github/workflows/mongodb-service.yml"
+  workflow_dispatch:
 
 env:
   SERVICE_DIR: pr-tracker-mongodb

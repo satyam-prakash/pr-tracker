@@ -1,0 +1,45 @@
+groups:
+  - name: ai_service
+    interval: 60s
+    rules:
+      # High error rate from AI agent
+      - alert: AIServiceHighErrorRate
+        expr: |
+          rate(http_requests_total{route=~"/api/analyze.*", status=~"5.."}[5m])
+          /
+          rate(http_requests_total{route=~"/api/analyze.*"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI service error rate above 10%"
+          description: |
+            {{ $value | humanizePercentage }} of AI analysis requests are failing.
+            Runbook: docs/runbooks/ai-service-degradation.md
+
+      # AI service completely unreachable
+      - alert: AIServiceDown
+        expr: |
+          up{job="ai-agent"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI service is DOWN"
+          description: |
+            The AI agent is not responding to Prometheus scrapes.
+            PR analysis will be unavailable.
+            Runbook: docs/runbooks/ai-service-degradation.md
+
+      # Latency SLA breach — AI calls taking >10s p95
+      - alert: AIServiceHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket{route=~"/api/analyze.*"}[5m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI analysis p95 latency exceeds 10s"
+          description: "Possible LLM provider degradation or token limit issues."

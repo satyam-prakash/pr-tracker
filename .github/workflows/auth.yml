@@ -4,17 +4,9 @@
 
 name: "Auth — CI/CD"
 
+# ⚠️  AUTO-TRIGGERS DISABLED — superseded by .github/workflows/ci-cd.yml
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "pr-tracker-backend/**"
-      - ".github/workflows/auth.yml"
-  push:
-    branches: [main]
-    paths:
-      - "pr-tracker-backend/**"
-      - ".github/workflows/auth.yml"
+  workflow_dispatch:
 
 env:
   SERVICE_DIR: pr-tracker-backend

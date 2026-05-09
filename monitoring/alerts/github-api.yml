@@ -1,0 +1,37 @@
+groups:
+  - name: github_api
+    interval: 60s
+    rules:
+      # Alert when GitHub API rate limit drops below 100 calls remaining
+      - alert: GitHubRateLimitLow
+        expr: github_rate_limit_remaining < 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GitHub API rate limit nearly exhausted"
+          description: |
+            Only {{ $value }} GitHub API calls remaining.
+            Runbook: docs/runbooks/github-api-rate-limit.md
+
+      # Alert when rate limit is critically low (< 10)
+      - alert: GitHubRateLimitCritical
+        expr: github_rate_limit_remaining < 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GitHub API rate limit critically exhausted"
+          description: |
+            Only {{ $value }} GitHub API calls remaining — polling will fail.
+            Runbook: docs/runbooks/github-api-rate-limit.md
+
+      # Alert if gateway is getting no metrics from GitHub (stale gauge)
+      - alert: GitHubRateLimitGaugeStale
+        expr: time() - github_rate_limit_remaining_last_updated > 3600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GitHub rate-limit gauge not updated in >1 hour"
+          description: "The gateway may not be reaching GitHub — check connectivity."

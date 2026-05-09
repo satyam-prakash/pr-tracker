@@ -1,6 +1,7 @@
 # ============================================================
 # PR Tracker — Monitoring Stack (Prometheus + Grafana)
 # Usage: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#        make monitor
 # ============================================================
 
 networks:
@@ -18,6 +19,7 @@ services:
     container_name: pr-tracker-prometheus
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -39,7 +41,11 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3001
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      # Provisioning config: tells Grafana where to find datasources + dashboards
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Dashboard JSON files — mounted into a subfolder the provisioning YAML points to
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     ports:
       - "3001:3000"
     networks:

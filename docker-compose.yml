@@ -1,6 +1,6 @@
 # ============================================================
 # PR Tracker — Full Stack Docker Compose
-# All 7 services: nginx + client + gateway + auth + main + ai + mongodb-svc
+# All 8 services: nginx + client + gateway + auth + main + ai + mongodb-svc + poller
 #
 # On EC2:  image: fields are used (pull from GHCR)
 # Locally: build: fields are used (build from source)
@@ -170,3 +170,25 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # ── POLLER WORKER ────────────────────────────────────────────────
+  # In Docker Compose (local/EC2): runs continuously every hour.
+  # In Kubernetes production: replaced by the pr-poller-cronjob.yaml CronJob.
+  poller:
+    image: ghcr.io/satyam-prakash/pr-tracker-poller:latest
+    build:
+      context: ./pr-tracker-poller
+      dockerfile: Dockerfile
+      target: production
+    container_name: pr-tracker-poller
+    environment:
+      - NODE_ENV=production
+      - CORE_SERVICE_URL=http://main-backend:5002
+      - POLLER_SECRET=${POLLER_SECRET}
+      - POLL_INTERVAL_MS=3600000   # 1 hour; set to 0 for single-run (k8s mode)
+    networks:
+      - app-internal
+    depends_on:
+      - main-backend
+    restart: unless-stopped
+

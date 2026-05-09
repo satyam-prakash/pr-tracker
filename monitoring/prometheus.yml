@@ -5,16 +5,21 @@ global:
     project: "pr-tracker"
     env: "production"
 
+# Load alert rules
+rule_files:
+  - "/etc/prometheus/alerts/github-api.yml"
+  - "/etc/prometheus/alerts/ai-service.yml"
+
 scrape_configs:
 
   - job_name: "gateway"
     static_configs:
-      - targets: ["service-router:5000"]
+      - targets: ["service-router:5003"]
     metrics_path: /metrics
 
   - job_name: "auth-service"
     static_configs:
-      - targets: ["auth-service:5001"]
+      - targets: ["auth-service:5005"]
     metrics_path: /metrics
 
   - job_name: "main-backend"
@@ -24,7 +29,12 @@ scrape_configs:
 
   - job_name: "ai-agent"
     static_configs:
-      - targets: ["ai-agent:5003"]
+      - targets: ["ai-agent:5001"]
+    metrics_path: /metrics
+
+  - job_name: "mongodb-service"
+    static_configs:
+      - targets: ["mongodb-service:5004"]
     metrics_path: /metrics
 
   - job_name: "prometheus-self"

@@ -4,17 +4,9 @@
 
 name: "Gateway — CI/CD"
 
+# ⚠️  AUTO-TRIGGERS DISABLED — superseded by .github/workflows/ci-cd.yml
 on:
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - "pr-tracker-service-router/**"
-      - ".github/workflows/gateway.yml"
-  push:
-    branches: [main]
-    paths:
-      - "pr-tracker-service-router/**"
-      - ".github/workflows/gateway.yml"
+  workflow_dispatch:
 
 env:
   SERVICE_DIR: pr-tracker-service-router

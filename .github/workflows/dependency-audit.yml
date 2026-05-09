@@ -1,0 +1,62 @@
+# ============================================================
+# Dependency Audit — Weekly auto-PR for security updates
+# ============================================================
+
+name: "Dependency Audit"
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: npm audit (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - pr-tracker-client
+          - pr-tracker-service-router
+          - pr-tracker-main-backend
+          - pr-tracker-backend
+          - pr-tracker-ai-agent
+          - pr-tracker-mongodb
+          - pr-tracker-poller
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm ci
+
+      - name: Audit for critical/high vulnerabilities
+        working-directory: ${{ matrix.service }}
+        # Exit with error only on high/critical — moderate tolerated
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Auto-fix and create PR
+        working-directory: ${{ matrix.service }}
+        run: |
+          npm audit fix --audit-level=high || true
+
+      - name: Create Pull Request if fixes were applied
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(${{ matrix.service }}): npm audit fix"
+          title: "chore(${{ matrix.service }}): security dependency update"
+          body: |
+            Automated security dependency update via `npm audit fix`.
+            Please review the changes before merging.
+          branch: "chore/dep-audit-${{ matrix.service }}"
+          delete-branch: true
+          labels: "dependencies,security"

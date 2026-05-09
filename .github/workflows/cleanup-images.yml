@@ -1,0 +1,41 @@
+# ============================================================
+# Cleanup old GHCR images — keeps only the 5 most recent tags
+# per service. Runs weekly to avoid registry bloat.
+# ============================================================
+
+name: "Cleanup GHCR Images"
+
+on:
+  schedule:
+    # Every Sunday at 02:00 UTC
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Prune images (${{ matrix.image_suffix }})
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image_suffix:
+          - client
+          - gateway
+          - main-backend
+          - auth
+          - ai-agent
+          - mongodb-service
+          - poller
+
+    steps:
+      - name: Delete old package versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: "pr-tracker-${{ matrix.image_suffix }}"
+          package-type: "container"
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
+          token: ${{ secrets.GITHUB_TOKEN }}
