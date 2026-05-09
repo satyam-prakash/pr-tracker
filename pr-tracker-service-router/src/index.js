@@ -17,6 +17,9 @@ const healthRoutes = require("./routes/health.routes");
 const app = express();
 const PORT = process.env.PORT;
 
+// Trust Nginx proxy to allow express-rate-limit to read X-Forwarded-For IPs properly
+app.set("trust proxy", 1);
+
 // ── Pre-auth middleware ────────────────────────────────────────────────────
 app.use(cookieParser());
 app.use(express.json());
