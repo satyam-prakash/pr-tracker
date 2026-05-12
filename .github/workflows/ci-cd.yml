@@ -219,7 +219,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.yml,nginx/nginx.conf"
+          source: "docker-compose.yml,docker-compose.monitoring.yml,nginx/nginx.conf,monitoring/"
           target: /opt/pr-tracker
           overwrite: true
           strip_components: 0
@@ -244,7 +244,7 @@ jobs:
             docker compose pull
 
             # Start all services with new images
-            docker compose up -d
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 
             # Clean up dangling images
             docker image prune -f
