@@ -6,7 +6,7 @@
 
 networks:
   app-internal:
-    external: true
+    driver: bridge
 
 volumes:
   prometheus-data:
