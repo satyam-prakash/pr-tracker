@@ -27,7 +27,7 @@ spec:
       containers:
         - name: main-backend
           # Replace with your actual GHCR image + SHA tag
-          image: ghcr.io/your-github-username/pr-tracker-main-backend:latest
+          image: ghcr.io/satyam-prakash/pr-tracker-main-backend:latest
           ports:
             - containerPort: 5002
           env:
@@ -56,7 +56,7 @@ spec:
                   name: pr-tracker-secrets
                   key: GITHUB_WEBHOOK_SECRET
             - name: PROXY_URL
-              value: "http://gateway-svc:5000"
+              value: "http://gateway-svc:5003"
           resources:
             requests:
               memory: "128Mi"

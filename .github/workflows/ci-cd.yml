@@ -1,6 +1,10 @@
 # ============================================================
 # CI/CD — Unified Pipeline
 # Triggers on PRs (lint + build) and main pushes (build + deploy).
+#
+# Strategy:
+#   - Docker Compose  → local dev & testing  (docker-compose.yml)
+#   - Kubernetes      → production deployment (k8s/*.yml)
 # ============================================================
 
 name: "CI/CD — All Services"
@@ -90,8 +94,6 @@ jobs:
           context: ./${{ matrix.service }}
           push: false
           target: ${{ matrix.target }}
-          # PR validation: use localhost placeholder for the client build-arg.
-          # No secret needed here — just validates the Dockerfile compiles.
           build-args: |
             ${{ matrix.service == 'pr-tracker-client' && 'VITE_SERVER_ENDPOINT=http://localhost' || '' }}
           cache-from: type=gha,scope=${{ matrix.service }}
@@ -160,17 +162,15 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           target: ${{ matrix.target }}
-          # secrets.* is only valid at step level, not in strategy.matrix.
-          # Only the client needs a build-arg; all other services skip this.
           build-args: |
             ${{ matrix.service == 'pr-tracker-client' && format('VITE_SERVER_ENDPOINT={0}', secrets.CLIENT_URL) || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # ── 4. Deploy to EC2 ────────────────────────────────────────────
+  # ── 4. Deploy to Kubernetes ──────────────────────────────────────
   deploy:
-    name: Deploy to EC2
+    name: Deploy to Kubernetes (EKS/K3s)
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -178,80 +178,64 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Step 4a: Stop containers + clean up bad paths ────────────
-      # Must run BEFORE scp-action. When containers are running, Docker
-      # holds active bind mounts. Even after rm -rf, the running nginx
-      # container can cause tar to see "nginx/nginx.conf: Is a directory".
-      # Stopping containers first releases all bind mount locks.
-      - name: Stop containers and clean stale paths on EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/pr-tracker
+      # ── Step 4a: Write kubeconfig from GitHub Secret ─────────────
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
-            # Stop all containers (releases all bind mount file handles)
-            docker compose down || true
+      # ── Step 4b: Apply namespace + secrets ───────────────────────
+      - name: Apply namespace
+        run: kubectl apply -f k8s/namespace.yml
 
-            # Ensure nginx dir exists as a real directory
-            mkdir -p nginx
+      - name: Apply secrets
+        run: |
+          kubectl create secret generic pr-tracker-secrets \
+            --namespace=pr-tracker \
+            --from-literal=MONGO_URI="${{ secrets.MONGO_URI }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --from-literal=ENCRYPTION_SECRET="${{ secrets.ENCRYPTION_SECRET }}" \
+            --from-literal=GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}" \
+            --from-literal=GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}" \
+            --from-literal=GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            --from-literal=GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
+            --from-literal=MISTRAL_API_KEY="${{ secrets.MISTRAL_API_KEY }}" \
+            --from-literal=POLLER_SECRET="${{ secrets.POLLER_SECRET }}" \
+            --from-literal=GRAFANA_PASSWORD="${{ secrets.GRAFANA_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-            # Remove the directory Docker wrongly created at the file-mount path
-            if [ -d nginx/nginx.conf ]; then
-              sudo rm -rf nginx/nginx.conf
-              echo "Cleaned up nginx/nginx.conf (was a directory)"
-            else
-              echo "nginx/nginx.conf is a file or absent — OK"
-            fi
+      # ── Step 4c: Apply all K8s manifests ─────────────────────────
+      - name: Apply K8s manifests
+        run: kubectl apply -f k8s/
 
-            # Fix permissions: Docker runs as root and may have created the 'nginx'
-            # parent directory as root. We must chown it so SCP (running as ubuntu) can write.
-            sudo chown -R $USER:$USER /opt/pr-tracker
+      # ── Step 4d: Force rolling update (pull latest images) ───────
+      # K8s won't re-pull :latest unless we force a rollout restart.
+      - name: Rollout restart all deployments
+        run: |
+          kubectl rollout restart deployment/client           -n pr-tracker
+          kubectl rollout restart deployment/service-router   -n pr-tracker
+          kubectl rollout restart deployment/auth-service     -n pr-tracker
+          kubectl rollout restart deployment/main-backend     -n pr-tracker
+          kubectl rollout restart deployment/ai-agent         -n pr-tracker
+          kubectl rollout restart deployment/mongodb-service  -n pr-tracker
 
-      # ── Step 4b: SCP config files from runner → EC2 ─────────────
-      # Containers are now stopped so no bind mount locks exist.
-      - name: Sync config files to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.yml,docker-compose.monitoring.yml,nginx/nginx.conf,monitoring/"
-          target: /opt/pr-tracker
-          overwrite: true
-          strip_components: 0
+      # ── Step 4e: Wait for rollouts to complete ───────────────────
+      - name: Wait for rollouts
+        run: |
+          kubectl rollout status deployment/client           -n pr-tracker --timeout=120s
+          kubectl rollout status deployment/service-router   -n pr-tracker --timeout=120s
+          kubectl rollout status deployment/auth-service     -n pr-tracker --timeout=120s
+          kubectl rollout status deployment/main-backend     -n pr-tracker --timeout=120s
+          kubectl rollout status deployment/ai-agent         -n pr-tracker --timeout=120s
+          kubectl rollout status deployment/mongodb-service  -n pr-tracker --timeout=120s
 
-      # ── Step 4c: Pull images and start services ───────────────────
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/pr-tracker
-
-            # Authenticate to GHCR
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-              --username ${{ github.actor }} \
-              --password-stdin
-
-            # Pull new images (containers are down so this is pure pull, no restart conflict)
-            docker compose pull
-
-            # Start all services with new images
-            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
-
-            # Clean up dangling images
-            docker image prune -f
-
-            echo "=== Deploy complete: $(date) ==="
-            docker compose ps
-
-
-
-
+      # ── Step 4f: Verify deployment ───────────────────────────────
+      - name: Show pod status
+        if: always()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n pr-tracker
+          echo "=== Services ==="
+          kubectl get svc -n pr-tracker
+          echo "=== Deploy complete: $(date) ==="

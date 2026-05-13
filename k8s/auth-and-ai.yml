@@ -26,14 +26,14 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: ghcr.io/your-github-username/pr-tracker-auth:latest
+          image: ghcr.io/satyam-prakash/pr-tracker-auth:latest
           ports:
-            - containerPort: 5001
+            - containerPort: 5005
           env:
             - name: NODE_ENV
               value: production
             - name: PORT
-              value: "5001"
+              value: "5005"
             - name: MONGO_URI
               valueFrom:
                 secretKeyRef:
@@ -71,13 +71,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 5001
+              port: 5005
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
-              port: 5001
+              port: 5005
             initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 3
@@ -92,8 +92,8 @@ spec:
   selector:
     app: auth-service
   ports:
-    - port: 5001
-      targetPort: 5001
+    - port: 5005
+      targetPort: 5005
   type: ClusterIP
 
 ---
@@ -125,21 +125,21 @@ spec:
     spec:
       containers:
         - name: ai-agent
-          image: ghcr.io/your-github-username/pr-tracker-ai-agent:latest
+          image: ghcr.io/satyam-prakash/pr-tracker-ai-agent:latest
           ports:
-            - containerPort: 5003
+            - containerPort: 5001
           env:
             - name: NODE_ENV
               value: production
             - name: PORT
-              value: "5003"
+              value: "5001"
             - name: MISTRAL_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: pr-tracker-secrets
                   key: MISTRAL_API_KEY
             - name: PROXY_URL
-              value: "http://gateway-svc:5000"
+              value: "http://gateway-svc:5003"
           resources:
             requests:
               memory: "128Mi"
@@ -150,13 +150,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 5003
+              port: 5001
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
-              port: 5003
+              port: 5001
             initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 3
@@ -171,8 +171,8 @@ spec:
   selector:
     app: ai-agent
   ports:
-    - port: 5003
-      targetPort: 5003
+    - port: 5001
+      targetPort: 5001
   type: ClusterIP
 
 ---
