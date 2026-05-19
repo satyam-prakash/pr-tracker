@@ -60,7 +60,11 @@ spec:
                   name: pr-tracker-secrets
                   key: ENCRYPTION_SECRET
             - name: CLIENT_URL
-              value: "https://your-domain.com"
+              value: "http://13.235.8.241"
+            - name: PROXY_URL
+              value: "http://gateway-svc:5003"
+            - name: GATEWAY_URL
+              value: "http://13.235.8.241"
           resources:
             requests:
               memory: "128Mi"
