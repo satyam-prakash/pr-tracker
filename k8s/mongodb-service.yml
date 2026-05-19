@@ -36,10 +36,7 @@ spec:
             - name: PORT
               value: "5004"
             - name: MONGODB_URI
-              valueFrom:
-                secretKeyRef:
-                  name: pr-tracker-secrets
-                  key: MONGO_URI
+              value: "mongodb+srv://satyampr56_db_user:7cs2q2Xvvp4cmDRg@cluster0.ulgcsaw.mongodb.net/?appName=Cluster0"
             - name: CLIENT_URL
               value: "http://13.235.8.241"
           resources:
