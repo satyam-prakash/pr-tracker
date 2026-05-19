@@ -128,13 +128,13 @@ spec:
               cpu: "500m"
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: 5003
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: 5003
             initialDelaySeconds: 30
             periodSeconds: 15
