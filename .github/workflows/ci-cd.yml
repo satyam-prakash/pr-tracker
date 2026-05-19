@@ -189,21 +189,6 @@ jobs:
       - name: Apply namespace
         run: kubectl apply -f k8s/namespace.yml
 
-      - name: Apply secrets
-        run: |
-          kubectl create secret generic pr-tracker-secrets \
-            --namespace=pr-tracker \
-            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --from-literal=ENCRYPTION_SECRET="${{ secrets.ENCRYPTION_SECRET }}" \
-            --from-literal=GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}" \
-            --from-literal=GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}" \
-            --from-literal=GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
-            --from-literal=GITHUB_WEBHOOK_SECRET="${{ secrets.GITHUB_WEBHOOK_SECRET }}" \
-            --from-literal=MISTRAL_API_KEY="${{ secrets.MISTRAL_API_KEY }}" \
-            --from-literal=POLLER_SECRET="${{ secrets.POLLER_SECRET }}" \
-            --from-literal=GRAFANA_PASSWORD="${{ secrets.GRAFANA_PASSWORD }}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
       # ── Step 4c: Apply all K8s manifests ─────────────────────────
       - name: Apply K8s manifests
         run: kubectl apply -f k8s/
