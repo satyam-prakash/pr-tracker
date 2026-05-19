@@ -15,14 +15,9 @@ metadata:
     nginx.ingress.kubernetes.io/limit-rps: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
 spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - pr-tracker.yourdomain.com
-      secretName: pr-tracker-tls
+  ingressClassName: traefik
   rules:
-    - host: pr-tracker.yourdomain.com
-      http:
+    - http:
         paths:
           - path: /api
             pathType: Prefix
