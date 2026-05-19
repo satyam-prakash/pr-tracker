@@ -193,7 +193,6 @@ jobs:
         run: |
           kubectl create secret generic pr-tracker-secrets \
             --namespace=pr-tracker \
-            --from-literal=MONGO_URI="${{ secrets.MONGO_URI }}" \
             --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --from-literal=ENCRYPTION_SECRET="${{ secrets.ENCRYPTION_SECRET }}" \
             --from-literal=GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}" \
