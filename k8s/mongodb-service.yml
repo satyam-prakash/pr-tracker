@@ -41,7 +41,7 @@ spec:
                   name: pr-tracker-secrets
                   key: MONGO_URI
             - name: CLIENT_URL
-              value: "https://pr-tracker.yourdomain.com"
+              value: "http://13.235.8.241"
           resources:
             requests:
               memory: "128Mi"
