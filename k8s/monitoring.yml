@@ -1,0 +1,482 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: pr-tracker
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        project: "pr-tracker"
+        env: "production"
+
+    rule_files:
+      - "/etc/prometheus/alerts/*.yml"
+
+    scrape_configs:
+      - job_name: "gateway"
+        static_configs:
+          - targets: ["gateway-svc:5003"]
+        metrics_path: /metrics
+
+      - job_name: "auth-service"
+        static_configs:
+          - targets: ["auth-svc:5005"]
+        metrics_path: /metrics
+
+      - job_name: "main-backend"
+        static_configs:
+          - targets: ["main-backend-svc:5002"]
+        metrics_path: /metrics
+
+      - job_name: "ai-agent"
+        static_configs:
+          - targets: ["ai-agent-svc:5001"]
+        metrics_path: /metrics
+
+      - job_name: "mongodb-service"
+        static_configs:
+          - targets: ["mongodb-svc:5004"]
+        metrics_path: /metrics
+
+      - job_name: "prometheus-self"
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: pr-tracker
+data:
+  ai-service.yml: |
+    groups:
+      - name: ai_service
+        interval: 60s
+        rules:
+          - alert: AIServiceHighErrorRate
+            expr: |
+              rate(http_requests_total{route=~"/api/analyze.*", status=~"5.."}[5m])
+              /
+              rate(http_requests_total{route=~"/api/analyze.*"}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "AI service error rate above 10%"
+              description: |
+                {{ $value | humanizePercentage }} of AI analysis requests are failing.
+                Runbook: docs/runbooks/ai-service-degradation.md
+
+          - alert: AIServiceDown
+            expr: |
+              up{job="ai-agent"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "AI service is DOWN"
+              description: |
+                The AI agent is not responding to Prometheus scrapes.
+                PR analysis will be unavailable.
+                Runbook: docs/runbooks/ai-service-degradation.md
+
+          - alert: AIServiceHighLatency
+            expr: |
+              histogram_quantile(0.95,
+                rate(http_request_duration_seconds_bucket{route=~"/api/analyze.*"}[5m])
+              ) > 10
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "AI analysis p95 latency exceeds 10s"
+              description: "Possible LLM provider degradation or token limit issues."
+  github-api.yml: |
+    groups:
+      - name: github_api
+        interval: 60s
+        rules:
+          - alert: GitHubRateLimitLow
+            expr: github_rate_limit_remaining < 100
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "GitHub API rate limit nearly exhausted"
+              description: |
+                Only {{ $value }} GitHub API calls remaining.
+                Runbook: docs/runbooks/github-api-rate-limit.md
+
+          - alert: GitHubRateLimitCritical
+            expr: github_rate_limit_remaining < 10
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "GitHub API rate limit critically exhausted"
+              description: |
+                Only {{ $value }} GitHub API calls remaining — polling will fail.
+                Runbook: docs/runbooks/github-api-rate-limit.md
+
+          - alert: GitHubRateLimitGaugeStale
+            expr: time() - github_rate_limit_remaining_last_updated > 3600
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "GitHub rate-limit gauge not updated in >1 hour"
+              description: "The gateway may not be reaching GitHub — check connectivity."
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: pr-tracker
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-svc:9090
+        isDefault: true
+        editable: false
+        jsonData:
+          timeInterval: "15s"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provisioning
+  namespace: pr-tracker
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: "PR Tracker Dashboards"
+        orgId: 1
+        folder: "PR Tracker"
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: pr-tracker
+data:
+  pr-tracker-overview.json: |
+    {
+      "__inputs": [
+        {
+          "name": "DS_PROMETHEUS",
+          "label": "Prometheus",
+          "description": "",
+          "type": "datasource",
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
+        }
+      ],
+      "__requires": [
+        { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.4.0" },
+        { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+        { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+        { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+        { "type": "panel", "id": "gauge", "name": "Gauge", "version": "" }
+      ],
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate (all routes)",
+          "type": "timeseries",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[5m])) by (route)",
+              "legendFormat": "{{route}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "palette-classic" }
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Error Rate (%)",
+          "type": "timeseries",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "100 * sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+              "legendFormat": "5xx error rate",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 3,
+          "title": "p95 Latency by Route",
+          "type": "timeseries",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+              "legendFormat": "p95 {{route}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 4,
+          "title": "GitHub Rate Limit Remaining",
+          "type": "gauge",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "github_rate_limit_remaining",
+              "legendFormat": "Remaining",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 5000,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "green", "value": 500 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "Total Requests (24h)",
+          "type": "stat",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(increase(http_requests_total[24h]))",
+              "legendFormat": "Total",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Active Instances (up)",
+          "type": "stat",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 12 },
+          "targets": [
+            {
+              "expr": "count(up == 1)",
+              "legendFormat": "Services Up",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 3 },
+                  { "color": "green", "value": 5 }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["pr-tracker", "overview"],
+      "templating": { "list": [] },
+      "time": { "from": "now-3h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "PR Tracker — Overview",
+      "uid": "pr-tracker-overview",
+      "version": 1
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: pr-tracker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.51.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.retention.time=15d"
+            - "--web.enable-lifecycle"
+          ports:
+            - containerPort: 9090
+              name: web
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: prometheus-alerts-volume
+              mountPath: /etc/prometheus/alerts
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-config
+        - name: prometheus-alerts-volume
+          configMap:
+            name: prometheus-alerts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-svc
+  namespace: pr-tracker
+spec:
+  ports:
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app: prometheus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: pr-tracker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.4.0
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin123"
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_SERVER_ROOT_URL
+              value: "http://localhost:3001"
+          ports:
+            - containerPort: 3000
+              name: web
+          volumeMounts:
+            - name: grafana-datasources-volume
+              mountPath: /etc/grafana/provisioning/datasources/prometheus.yaml
+              subPath: prometheus.yaml
+            - name: grafana-dashboards-provisioning-volume
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+              subPath: dashboards.yaml
+            - name: grafana-dashboards-volume
+              mountPath: /etc/grafana/dashboards/pr-tracker-overview.json
+              subPath: pr-tracker-overview.json
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: grafana-datasources-volume
+          configMap:
+            name: grafana-datasources
+        - name: grafana-dashboards-provisioning-volume
+          configMap:
+            name: grafana-dashboards-provisioning
+        - name: grafana-dashboards-volume
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-svc
+  namespace: pr-tracker
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3001
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: grafana
