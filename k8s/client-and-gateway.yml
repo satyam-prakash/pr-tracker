@@ -118,7 +118,7 @@ spec:
                   name: pr-tracker-secrets
                   key: GITHUB_WEBHOOK_SECRET
             - name: CLIENT_URL
-              value: "http://13.235.8.241"
+              value: "http://13.207.3.18"
           resources:
             requests:
               memory: "128Mi"

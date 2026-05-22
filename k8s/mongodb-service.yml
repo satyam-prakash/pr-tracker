@@ -38,7 +38,7 @@ spec:
             - name: MONGODB_URI
               value: "mongodb+srv://satyampr56_db_user:7cs2q2Xvvp4cmDRg@cluster0.ulgcsaw.mongodb.net/?appName=Cluster0"
             - name: CLIENT_URL
-              value: "http://13.235.8.241"
+              value: "http://13.207.3.18"
           resources:
             requests:
               memory: "128Mi"
