@@ -136,7 +136,7 @@ export function Dashboard({ needsImport, loading: appLoading }) {
               </div>
             </>
           ) : (
-            <div className="py-6 text-center text-xs text-secondary">No PR data yet</div>
+            <div className="py-6 text-center text-xs text-secondary">No PRs data yet</div>
           )}
         </div>
       </div>
